@@ -2,7 +2,7 @@
 
 Quantitative trading research engine: strategies, execution costs, and anti-overfitting guardrails.
 
-This is a **research** engine. It takes a price panel, builds causal features, emits target weights from one of four textbook strategies, fills those weights on the **next bar**, subtracts commissions and slippage, and reports Sharpe, Sortino, drawdown, turnover, costs, and exposure.
+This is a **research** engine. It takes a price panel, builds causal features, emits target weights from one of four textbook strategies, fills those weights on the **next bar**, subtracts commissions and slippage, and reports Sharpe, Sortino, drawdown, turnover, costs, and exposure. Combinatorial purged CV (AFML Ch.7) and the deflated Sharpe ratio (Bailey & López de Prado 2014) are encoded in code, not just named in a blog post.
 
 It is **not**:
 
@@ -72,7 +72,7 @@ All four are implemented, wired through the CLI, and covered by tests.
 | Cross-sectional | Rank long-short | Dollar-neutral, unit gross |
 | Pairs | Trade residual/spread of two names | Synthetic `ou_pair` process is cointegrated-like; hedge ratio 1 in logs |
 
-None of these is “the DRW secret.” They exist so the rest of the engine (delay, costs, PIT universe, walk-forward) has something to chew on.
+None of these is “the DRW secret.” They exist so the rest of the engine (delay, costs, PIT universe, walk-forward, purged CV, DSR) has something to chew on.
 
 ## Cost model
 
@@ -87,9 +87,11 @@ Costs hit traded notional at fill time. Tests assert **gross PnL >= net PnL** wh
 - **Look-ahead.** Features at t are invariant to prices after t. Test: two panels identical through t, different after; feature values through t match.
 - **No future bars.** Rolling windows only use dates `<= t`. `ExecutionModel.fill_delay` must be `>= 1`.
 - **Walk-forward.** Expanding or rolling splits with an optional embargo. Test-window dates never appear in train. Parameter choice, if any, belongs on train.
+- **Purged k-fold / combinatorial purged CV.** López de Prado, *Advances in Financial Machine Learning*, Chapter 7: overlapping labels are purged from train; an embargo follows the test window. CPCV enumerates combinations of test groups. See `src/qre/research/purged_cv.py` and `tests/test_purged_cv.py`.
+- **Deflated Sharpe.** Bailey & López de Prado (2014). DSR is PSR evaluated at the expected-max Sharpe under `n_trials` independent tests. A pre-declared spec uses `n_trials: 1`. If you searched twenty YAMLs, pass 20. See `src/qre/analytics/dsr.py`.
 - **Survivorship / point-in-time universe.** Membership is as-of date. The synthetic generator can delist a symbol mid-sample. A delisted name does not appear after `delist_date`. See `src/qre/data/universe.py` and [RESEARCH.md](RESEARCH.md).
 
-Walk-forward is not a magic wand. Picking the YAML with the best walk-forward Sharpe over the full history is still spec-search. That failure mode is discussed in RESEARCH.md; the engine will not stop you from doing it, but it will not pretend the number is clean.
+Walk-forward is not a magic wand. Picking the YAML with the best walk-forward Sharpe over the full history is still spec-search. That failure mode is discussed in RESEARCH.md; the engine will not stop you from doing it, but it will not pretend the number is clean. DSR is the correction for that search, not a license to search harder.
 
 ## Layout
 
@@ -103,7 +105,9 @@ src/qre/
   portfolio/simulator.py
   execution/model.py    # commission_bps + slippage_bps, next-bar fill
   analytics/metrics.py
+  analytics/dsr.py      # Bailey & López de Prado 2014 DSR
   research/walk_forward.py
+  research/purged_cv.py # AFML Ch.7 purge + embargo, CPCV
   cli.py
 ```
 

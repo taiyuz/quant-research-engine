@@ -16,11 +16,13 @@ from typing import Any
 import polars as pl
 import yaml
 
+from qre.analytics.dsr import deflated_sharpe, non_annualized_sharpe
 from qre.analytics.metrics import PerformanceReport, compute
 from qre.data.loader import generate_synthetic_ohlcv, load_ohlcv_csv, load_ohlcv_parquet
 from qre.execution.model import ExecutionModel
 from qre.features.pipeline import build_features
 from qre.portfolio.simulator import simulate
+from qre.research.purged_cv import combinatorial_purged_cv, purged_kfold
 from qre.research.walk_forward import make_splits
 from qre.strategies.base import build_strategy
 from qre.types import (
@@ -127,6 +129,18 @@ def run_backtest(cfg: dict[str, Any]) -> tuple[PerformanceReport, list[str]]:
         )
     )
 
+    n_trials = int(cfg.get("n_trials", 1))
+    col = "net_ret" if "net_ret" in result.equity.columns else "net_pnl"
+    sr_na = non_annualized_sharpe(result.equity.get_column(col).to_numpy())
+    dsr = deflated_sharpe(sr_na, n_obs=int(report.n_bars), n_trials=n_trials)
+    dsr_s = "nan" if not math.isfinite(dsr) else f"{dsr:.4f}"
+    sr_s = "nan" if not math.isfinite(sr_na) else f"{sr_na:.4f}"
+    logs.append(f"  sharpe_non_ann:         {sr_s}")
+    logs.append(
+        f"  deflated_sharpe:        {dsr_s}  "
+        f"(Bailey & Lopez de Prado 2014; n_trials={n_trials})"
+    )
+
     wf = cfg.get("walk_forward")
     if wf:
         dates = panel.dates
@@ -168,6 +182,33 @@ def run_backtest(cfg: dict[str, Any]) -> tuple[PerformanceReport, list[str]]:
                     f"(train ends {split.train_end})",
                 )
             )
+
+    pcv = cfg.get("purged_cv") or {}
+    if pcv:
+        dates = list(panel.dates)
+        n_groups = int(pcv.get("n_groups", 6))
+        n_test = int(pcv.get("n_test_groups", 2))
+        embargo = int(pcv.get("embargo_bars", 5))
+        horizon = int(pcv.get("label_horizon_bars", 1))
+        if pcv.get("combinatorial", True):
+            cv_folds = combinatorial_purged_cv(
+                dates, n_groups, n_test, embargo, horizon
+            )
+            kind = "combinatorial purged CV"
+        else:
+            cv_folds = purged_kfold(dates, n_groups, embargo, horizon)
+            kind = "purged k-fold"
+        logs.append(
+            f"{kind}: {len(cv_folds)} folds "
+            f"(groups={n_groups}, embargo={embargo}, label_horizon={horizon}). "
+            "AFML Ch.7 purge+embargo encoded."
+        )
+        logs.append(
+            f"  example fold 0: train={len(cv_folds[0].train_dates)} "
+            f"test={len(cv_folds[0].test_dates)} purged={len(cv_folds[0].purged_dates)} "
+            f"embargo={len(cv_folds[0].embargo_dates)}"
+        )
+
     if panel.origin is DataOrigin.SYNTHETIC:
         logs.append(SYNTHETIC_FOOTER)
     return report, logs
