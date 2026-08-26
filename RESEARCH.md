@@ -148,3 +148,32 @@ The useful output of a synthetic run is: look-ahead tests pass, delist handling 
 ---
 
 No live performance is claimed. No live performance should be inferred. If a number in this repository looks good, start by assuming you made a mistake, then assume you spec-searched, then assume the cost model is too kind. In that order.
+
+---
+
+## 10. Purged k-fold and combinatorial purged CV
+
+Walk-forward with an embargo stops a *contiguous* test window from sitting inside train. It does not stop you from using every other Tuesday as a test set while the labels that overlap those Tuesdays stay in train.
+
+López de Prado, *Advances in Financial Machine Learning* (2018), Chapter 7: a label formed at bar `i` that uses information through `i + h` overlaps a test interval `[t0, t1]` when `i <= t1` and `i + h >= t0`. Those train observations are **purged**. Serial correlation still leaks through the first bars *after* the test window; those are the **embargo**.
+
+This repo encodes that in `qre.research.purged_cv`:
+
+- `purged_kfold` — contiguous groups, one held out per fold, purge + embargo applied.
+- `combinatorial_purged_cv` (CPCV) — every combination of `n_test_groups` out of `n_groups` as the test set, same purge + embargo.
+
+`tests/test_purged_cv.py` asserts train/test disjointness, that the label-horizon overlap is gone from train, and that embargo bars after test are gone from train. CPCV fold count equals `C(n_groups, n_test_groups)`.
+
+Purged CV is still not a panacea. If you CPCV twenty configs and keep the winner, you used the test combinations to select. That is section 4 again. Report `n_trials`.
+
+## 11. Deflated Sharpe ratio
+
+Bailey and López de Prado, "The Deflated Sharpe Ratio: Correcting for Selection Bias, Backtest Overfitting and Non-Normality," *Journal of Portfolio Management* (2014).
+
+The number you want is not the raw Sharpe. It is the **probability** that the true Sharpe exceeds the Sharpe you should have expected *from the fact that you tried `n_trials` independent tests and kept the max*. That is PSR evaluated at the expected-max Sharpe under `n_trials` (DSR).
+
+`qre.analytics.dsr` implements PSR / DSR with `statistics.NormalDist` (no scipy). The CLI prints `deflated_sharpe` next to the pipeline demo. `n_trials: 1` in `configs/sample_momentum.yaml` is the honest setting for a **pre-declared** spec. If you searched 20 YAMLs, pass 20; DSR will fall. `tests/test_dsr.py` checks that DSR falls as `n_trials` rises, and that zero-vol returns NaN.
+
+These two papers are cited because the modules encode them. We do not cite work we did not implement.
+
+No live performance is claimed. No live performance should be inferred.
