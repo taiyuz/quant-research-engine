@@ -12,3 +12,4 @@ __all__ = [
     "SYNTHETIC_FOOTER",
     "__version__",
 ]
+

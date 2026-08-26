@@ -17,3 +17,10 @@ walk_forward:
   test_bars: 63
   step_bars: 63
   embargo_bars: 5
+n_trials: 1
+purged_cv:
+  combinatorial: true
+  n_groups: 6
+  n_test_groups: 2
+  embargo_bars: 5
+  label_horizon_bars: 1
