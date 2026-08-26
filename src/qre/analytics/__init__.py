@@ -6,3 +6,4 @@ from qre.analytics.metrics import (
     sharpe_ratio,
     sortino_ratio,
 )
+from qre.analytics.dsr import deflated_sharpe, probabilistic_sharpe_ratio
