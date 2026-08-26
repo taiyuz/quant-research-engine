@@ -1,0 +1,19 @@
+strategy: momentum
+lookback: 20
+rebalance: daily
+fill_delay: 1
+costs:
+  commission_bps: 1.0
+  slippage_bps: 2.0
+data:
+  n_symbols: 8
+  n_bars: 504
+  seed: 42
+  process: gbm
+  delist_mid_sample: true
+walk_forward:
+  mode: expanding
+  train_bars: 252
+  test_bars: 63
+  step_bars: 63
+  embargo_bars: 5

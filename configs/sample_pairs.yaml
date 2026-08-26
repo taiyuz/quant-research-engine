@@ -1,0 +1,15 @@
+strategy: pairs
+lookback: 40
+rebalance: daily
+fill_delay: 1
+leg_a: SYN000
+leg_b: SYN001
+costs:
+  commission_bps: 1.0
+  slippage_bps: 2.0
+data:
+  n_symbols: 4
+  n_bars: 504
+  seed: 13
+  process: ou_pair
+  delist_mid_sample: false

@@ -1,0 +1,13 @@
+strategy: mean_reversion
+lookback: 20
+rebalance: daily
+fill_delay: 1
+costs:
+  commission_bps: 1.0
+  slippage_bps: 2.0
+data:
+  n_symbols: 6
+  n_bars: 504
+  seed: 7
+  process: ou
+  delist_mid_sample: false
