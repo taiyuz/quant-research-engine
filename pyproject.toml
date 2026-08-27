@@ -9,7 +9,7 @@ description = "Quantitative trading research engine: strategies, execution costs
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
-authors = [{name = "taiyuz"}]
+authors = [{name = "Taiyu Zhu"}]
 dependencies = [
     "polars>=1.0",
     "numpy>=1.26",
@@ -23,6 +23,9 @@ dev = [
 
 [project.scripts]
 qre-backtest = "qre.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
