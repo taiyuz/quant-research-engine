@@ -1,15 +1,12 @@
 # quant-research-engine
 
+[![ci](https://github.com/taiyuz/quant-research-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/taiyuz/quant-research-engine/actions/workflows/ci.yml)
+
 Quantitative trading research engine: strategies, execution costs, and anti-overfitting guardrails.
 
-This is a **research** engine. It takes a price panel, builds causal features, emits target weights from one of four textbook strategies, fills those weights on the **next bar**, subtracts commissions and slippage, and reports Sharpe, Sortino, drawdown, turnover, costs, and exposure. Combinatorial purged CV (AFML Ch.7) and the deflated Sharpe ratio (Bailey & López de Prado 2014) are encoded in code, not just named in a blog post.
+Most backtests fail for boring reasons: **look-ahead** (using a future close to trade today), **survivorship** (testing only names that still exist), **overfitting** (trying twenty specs and reporting the winner), **train/test leakage** (tuning on the evaluation window), and **ignoring costs and slippage**. This repo is a research simulator that encodes those constraints in code and tests. It is **not** a live OMS, broker adapter, or evidence of an edge.
 
-It is **not**:
-
-- a signal that prints money
-- a live trading system, OMS, or broker adapter
-- evidence of an edge, on synthetic data or otherwise
-- a notebook that curve-fits a ticker until the Sharpe looks like a resume line
+The engine takes a price panel, builds causal features, emits target weights from one of four textbook strategies, fills those weights on the **next bar**, subtracts commissions and slippage (`ExecutionModel`), and reports Sharpe, Sortino, drawdown, turnover, costs, and exposure. Combinatorial purged CV (AFML Ch.7) and the deflated Sharpe ratio (Bailey & López de Prado 2014) live in the source, not only in a blog post.
 
 Sample runs use **labeled SYNTHETIC** prices (GBM with drift 0, OU, or a cointegrated-like pair). Metrics on those runs are a pipeline demo. Read [RESEARCH.md](RESEARCH.md) before you trust any number this repo can print, including numbers you get after swapping in “real” CSV.
 
@@ -31,7 +28,7 @@ historical data → loader → features → strategy → portfolio sim
     → analytics (Sharpe, Sortino, max DD, vol, turnover, costs, exposure, PnL)
 ```
 
-Default execution convention, encoded in code not comments: **signal at t uses close[t]; fill at t+1 close after costs.** You cannot trade the same bar’s close you used to form the signal.
+Default execution convention, encoded in code not comments: **signal at t uses close[t]; fill at t+1 close after costs.** You cannot trade the same bar’s close you used to form the signal. `ExecutionModel.fill_delay` must be `>= 1`.
 
 ## SYNTHETIC data warning
 
@@ -42,31 +39,39 @@ Default execution convention, encoded in code not comments: **signal at t uses c
 > End of every synthetic CLI report:
 > `This run used labeled synthetic prices. Do not treat these metrics as evidence of an edge.`
 
-## Install and one-command sample backtest
+## Install and how to run pytest
 
 Requires Python 3.11+.
 
 ```bash
 pip install -e ".[dev]"
+pytest
+```
+
+That is the same install and `pytest` CI runs on Python 3.12 ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)). A green badge at the top means the suite on `main` passed; it is not a performance claim.
+
+One-command sample backtest (synthetic, labeled as such):
+
+```bash
 qre-backtest configs/sample_momentum.yaml
 ```
 
 Other demos: `configs/sample_mean_reversion.yaml`, `configs/sample_cross_sectional.yaml`, `configs/sample_pairs.yaml`.
 
-Tests:
+Sample CLI output always carries the synthetic labels. Numbers are omitted here on purpose — they are a plumbing demo, not an edge:
 
-```bash
-pytest
 ```
-
-CI runs the same install and `pytest` on Python 3.12.
+*** SYNTHETIC DATA — NOT A MARKET RESULT ***
+...
+This run used labeled synthetic prices. Do not treat these metrics as evidence of an edge.
+```
 
 ## Strategies
 
 All four are implemented, wired through the CLI, and covered by tests.
 
 | Name | Rule | Notes |
-|------|------|--------|
+|------|------|-------|
 | Time-series momentum | `sign` of lagged lookback return | Equal-weight across names with a valid return |
 | Mean reversion | Fade rolling z-score of price vs MA | Window is right-aligned at t |
 | Cross-sectional | Rank long-short | Dollar-neutral, unit gross |
@@ -74,7 +79,9 @@ All four are implemented, wired through the CLI, and covered by tests.
 
 None of these is “the DRW secret.” They exist so the rest of the engine (delay, costs, PIT universe, walk-forward, purged CV, DSR) has something to chew on.
 
-## Cost model
+## Execution model
+
+Public name: `ExecutionModel` (fees + slippage, next-bar fill). There is no `CostModel` alias.
 
 ```
 cost = (commission_bps + slippage_bps) / 1e4 * abs(delta_weight) * nav
@@ -103,7 +110,7 @@ src/qre/
   features/             # lagged/rolling, look-ahead assertions
   strategies/           # momentum, mean-reversion, cross-sectional, pairs
   portfolio/simulator.py
-  execution/model.py    # commission_bps + slippage_bps, next-bar fill
+  execution/model.py    # ExecutionModel: commission_bps + slippage_bps, next-bar fill
   analytics/metrics.py
   analytics/dsr.py      # Bailey & López de Prado 2014 DSR
   research/walk_forward.py
@@ -117,4 +124,4 @@ Configs live in `configs/`. Tests live in `tests/`.
 
 Every `PerformanceReport` carries `data_origin` and `after_costs`. If origin is `SYNTHETIC`, the number is a test of the plumbing. If origin is `USER_PROVIDED`, the number is still only as honest as your panel, your costs, and your research process. Start with [RESEARCH.md](RESEARCH.md).
 
-MIT license. Copyright 2026 taiyuz.
+MIT license. Copyright 2026 Taiyu Zhu.
