@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 import polars as pl
+import pytest
 
 from qre.analytics.metrics import compute
 from qre.data.loader import generate_synthetic_ohlcv
@@ -45,6 +46,14 @@ def test_cost_formula() -> None:
     abs_delta = 0.5
     cost = m.cost_from_weight_delta(abs_delta, nav)
     assert abs(cost - (3.0 / 1e4) * 0.5 * nav) < 1e-9
+
+
+def test_fill_delay_rejects_same_bar() -> None:
+    """Look-ahead at execution: fill_delay < 1 would trade the signal bar's close."""
+    with pytest.raises(ValueError, match="fill_delay"):
+        ExecutionModel(fill_delay=0)
+    ok = ExecutionModel(fill_delay=1)
+    assert ok.fill_delay == 1
 
 
 def test_gross_pnl_ge_net_pnl_when_turnover() -> None:
