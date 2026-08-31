@@ -51,3 +51,27 @@ def test_cpcv_fold_count() -> None:
     for f in folds:
         f.validate()
         assert set(f.train_dates).isdisjoint(set(f.test_dates))
+
+
+def test_purge_gap_before_test_never_enters_train() -> None:
+    """Bars whose labels overlap the test window form a purge gap and stay out of train.
+
+    AFML Ch.7: a label formed at index i with horizon h overlaps a test window
+    starting at t0 when i <= t1 and i + h >= t0. With embargo_bars=0, the h
+    sessions immediately before an interior test fold must be in purged_dates,
+    not train.
+    """
+    dates = _dates(80)
+    horizon = 4
+    folds = purged_kfold(dates, n_splits=4, embargo_bars=0, label_horizon_bars=horizon)
+    interior = [f for f in folds if dates.index(min(f.test_dates)) >= horizon]
+    assert interior
+    for f in interior:
+        t0 = dates.index(min(f.test_dates))
+        gap = dates[t0 - horizon : t0]
+        assert len(gap) == horizon
+        for d in gap:
+            assert d not in f.train_dates
+            assert d not in f.test_dates
+            assert d in f.purged_dates
+        assert set(gap) <= set(f.purged_dates)
