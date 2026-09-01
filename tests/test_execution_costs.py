@@ -39,6 +39,34 @@ def _panel_two_days() -> BarPanel:
     )
 
 
+def _panel_uptrend(n_bars: int, start_px: float, daily_ret: float) -> BarPanel:
+    """Labeled SYNTHETIC close-only path with a constant daily simple return."""
+    start = date(2020, 1, 2)
+    rows = []
+    px = start_px
+    for i in range(n_bars):
+        d = start + timedelta(days=i)
+        rows.append(
+            {
+                "date": d,
+                "symbol": "AAA",
+                "open": px,
+                "high": px,
+                "low": px,
+                "close": px,
+                "volume": 1,
+            }
+        )
+        px *= 1.0 + daily_ret
+    return BarPanel(
+        frame=pl.DataFrame(rows).with_columns(pl.col("date").cast(pl.Date)),
+        metadata=PanelMetadata(
+            origin=DataOrigin.SYNTHETIC,
+            notes="SYNTHETIC 5bp/day uptrend fixture — not a market",
+        ),
+    )
+
+
 def test_cost_formula() -> None:
     m = ExecutionModel(commission_bps=1.0, slippage_bps=2.0)
     assert abs(m.cost_rate - 3.0 / 1e4) < 1e-15
@@ -105,4 +133,48 @@ def test_next_bar_fill_does_not_earn_same_bar_move() -> None:
     assert abs(rets[0]) < 1e-12
     assert abs(rets[1]) < 1e-12
     assert abs(rets[2] - (121.0 / 110.0 - 1.0)) < 1e-12
-    _ = timedelta
+
+
+def test_high_turnover_costs_flip_modest_gross_profit() -> None:
+    """100% daily turnover at 10 bps one-way can flip a small trend into a net loss.
+
+    Sloppy backtests report the zero-cost (gross) number. RESEARCH.md §3: a
+    strategy that turns over 100% a day at 10 bps round-trip needs a raw edge
+    most textbook signals do not have. This fixture is labeled SYNTHETIC and
+    is not a market result; it only asserts the sign flip. No Sharpe is claimed.
+    """
+    daily_ret = 0.0005  # 5 bp/day drift, below 10 bp one-way cost
+    panel = _panel_uptrend(n_bars=20, start_px=100.0, daily_ret=daily_ret)
+    dates = panel.dates
+    weights = pl.DataFrame(
+        {
+            "date": dates,
+            "symbol": ["AAA"] * len(dates),
+            "target_weight": [1.0 if i % 2 else 0.0 for i in range(len(dates))],
+        }
+    ).with_columns(pl.col("date").cast(pl.Date))
+
+    zero = simulate(
+        panel,
+        weights,
+        ExecutionModel(commission_bps=0.0, slippage_bps=0.0),
+        initial_nav=1_000_000.0,
+    )
+    taxed = simulate(
+        panel,
+        weights,
+        ExecutionModel(commission_bps=5.0, slippage_bps=5.0),
+        initial_nav=1_000_000.0,
+    )
+    zero_rep = compute(zero, after_costs=True)
+    taxed_rep = compute(taxed, after_costs=True)
+
+    assert zero_rep.total_cost == 0.0
+    assert zero_rep.net_pnl > 0.0
+    assert taxed_rep.gross_pnl > 0.0
+    assert taxed_rep.total_cost > 0.0
+    assert taxed_rep.net_pnl < 0.0
+    assert taxed_rep.gross_pnl > taxed_rep.net_pnl
+    fills = taxed.equity.filter(pl.col("turnover") > 0)
+    assert fills.height >= 10
+    assert float(fills.get_column("turnover").mean()) > 0.9
