@@ -89,6 +89,8 @@ cost = (commission_bps + slippage_bps) / 1e4 * abs(delta_weight) * nav
 
 Costs hit traded notional at fill time. Tests assert **gross PnL >= net PnL** whenever turnover is positive. Ignoring costs is how a lot of “Sharpe 2” notebooks are born; this engine will not let you forget the line item.
 
+Honest example (labeled SYNTHETIC fixture, not a market): a 0/1 flip every bar on a 5 bp/day uptrend is a **gross profit** and a **net loss** at 10 bps one-way. Same path, same weights. A notebook that prints only the pre-cost line would call that an edge. Pytest asserts the sign flip in `tests/test_execution_costs.py`. No Sharpe is printed for that fixture on purpose.
+
 ## Anti-overfitting guardrails (in code + tests, not just docs)
 
 - **Look-ahead.** Features at t are invariant to prices after t. Test: two panels identical through t, different after; feature values through t match.
@@ -97,6 +99,7 @@ Costs hit traded notional at fill time. Tests assert **gross PnL >= net PnL** wh
 - **Purged k-fold / combinatorial purged CV.** López de Prado, *Advances in Financial Machine Learning*, Chapter 7: overlapping labels are purged from train; an embargo follows the test window. CPCV enumerates combinations of test groups. See `src/qre/research/purged_cv.py` and `tests/test_purged_cv.py`.
 - **Deflated Sharpe.** Bailey & López de Prado (2014). DSR is PSR evaluated at the expected-max Sharpe under `n_trials` independent tests. A pre-declared spec uses `n_trials: 1`. If you searched twenty YAMLs, pass 20. See `src/qre/analytics/dsr.py`.
 - **Survivorship / point-in-time universe.** Membership is as-of date. The synthetic generator can delist a symbol mid-sample. A delisted name does not appear after `delist_date`. See `src/qre/data/universe.py` and [RESEARCH.md](RESEARCH.md).
+- **High-turnover cost drag.** 100% daily turnover at 10 bps one-way can flip a modest gross profit into a net loss. That is ignored-costs, not an execution bug. Test: `tests/test_execution_costs.py::test_high_turnover_costs_flip_modest_gross_profit`.
 
 Walk-forward is not a magic wand. Picking the YAML with the best walk-forward Sharpe over the full history is still spec-search. That failure mode is discussed in RESEARCH.md; the engine will not stop you from doing it, but it will not pretend the number is clean. DSR is the correction for that search, not a license to search harder.
 
