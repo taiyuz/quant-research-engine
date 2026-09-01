@@ -1,3 +1,8 @@
+# Labeled SYNTHETIC demo. GBM drift is 0. Do not tune lookback until Sharpe looks good.
+# n_trials: 1 is honest only for a pre-declared spec. If you searched, pass the search size.
+# 1+2 bps is a placeholder coupon so costs are not zero, not a market-impact model.
+# High daily turnover can flip a modest gross profit to a net loss; see
+# tests/test_execution_costs.py::test_high_turnover_costs_flip_modest_gross_profit.
 strategy: momentum
 lookback: 20
 rebalance: daily
