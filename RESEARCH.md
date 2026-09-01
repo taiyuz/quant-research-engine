@@ -48,6 +48,8 @@ cost = (commission_bps + slippage_bps) / 1e4 * abs(delta_weight) * nav
 
 at fill time. Tests require `gross PnL >= net PnL` when turnover is positive. That is the floor, not a market-impact model.
 
+The stronger statement, encoded in `tests/test_execution_costs.py::test_high_turnover_costs_flip_modest_gross_profit`: a 0/1 flip every bar on a 5 bp/day uptrend is profitable with costs off and a loss at 10 bps one-way. Same path, same weights. If your notebook only prints gross PnL, it would call that path an edge. It is not. The fixture is labeled SYNTHETIC. The test asserts the sign flip and does not report a Sharpe.
+
 Slippage in one number is already a fantasy. Capacity is worse. A pairs residual that looks clean on four synthetic names at $1mm NAV is not a license to do it with 3% of ADV in a single-name ETF. If you do not model impact, do not report the Sharpe as “after costs.” You reported “after a coupon for the borrow and a wish.”
 
 Also: bid-ask, borrow, fees that scale with name, and the fact that next-bar close is not a fill you will get in size. The bundled 1 bp + 2 bp is a placeholder so the plumbing is honest. It is not your production cost.
@@ -143,7 +145,7 @@ This run used labeled synthetic prices. Do not treat these metrics as evidence o
 
 `PerformanceReport.data_origin` is `SYNTHETIC`. If you delete those strings and keep the numbers, you are misrepresenting the work. If you replace the panel with real prices and keep the same research sins listed above, you are also misrepresenting the work — you just have a more expensive false positive.
 
-The useful output of a synthetic run is: look-ahead tests pass, delist handling works, costs reduce PnL, walk-forward dates do not overlap, and the report cannot forget where the prices came from. That is the recruiting bar this repo is aimed at. Alpha lives somewhere else, and it has to survive a process at least this hostile.
+The useful output of a synthetic run is: look-ahead tests pass, delist handling works, costs can flip the sign of PnL, walk-forward dates do not overlap, and the report cannot forget where the prices came from. That is the recruiting bar this repo is aimed at. Alpha lives somewhere else, and it has to survive a process at least this hostile.
 
 ---
 
