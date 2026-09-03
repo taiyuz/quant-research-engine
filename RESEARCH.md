@@ -22,6 +22,12 @@ If you add a feature and you cannot write that test for it, you do not have a fe
 
 Same-bar close is the leak juniors argue about. “But in production we trade the close.” No, you don’t — not the close you just used in the z-score, not with zero latency, not at the mid. If you want a close-to-close research convention, delay the fill. If you want a next-open convention, say so and still delay. What you may not do is silently earn the bar that constructed the signal.
 
+There is a second look-ahead the feature tests do not catch: **look-ahead in the label**. `y_t = close[T]/close[t] - 1` (remaining return to the end of the backtest) uses the whole sample path as the target. Mutating the last bar moves every earlier label. A finite-horizon forward return `close[t+h]/close[t] - 1` does not. Those finite-horizon labels are still future information, which is why they are labels and not features, and why purged CV exists (section 10). They must not go in the signal frame.
+
+A related dating bug: with `fill_delay=1`, `y_t = close[t+1]/close[t] - 1` is the untradeable gap between the signal close and the fill. The executable target starts at the fill: `close[t+1+h]/close[t+1] - 1`. Scoring a model on the gap is scoring it on a return the simulator will not give you.
+
+`tests/test_label_lookahead.py` mutates prices after `t+h`: a horizon-h label at t does not move; a remaining-sample label at t does. Putting `fwd_ret_h` through `assert_features_invariant_to_future` fails. No Sharpe is claimed.
+
 ---
 
 ## 2. Survivorship
@@ -145,7 +151,7 @@ This run used labeled synthetic prices. Do not treat these metrics as evidence o
 
 `PerformanceReport.data_origin` is `SYNTHETIC`. If you delete those strings and keep the numbers, you are misrepresenting the work. If you replace the panel with real prices and keep the same research sins listed above, you are also misrepresenting the work — you just have a more expensive false positive.
 
-The useful output of a synthetic run is: look-ahead tests pass, delist handling works, costs can flip the sign of PnL, walk-forward dates do not overlap, and the report cannot forget where the prices came from. That is the recruiting bar this repo is aimed at. Alpha lives somewhere else, and it has to survive a process at least this hostile.
+The useful output of a synthetic run is: look-ahead tests pass (features and labels), delist handling works, costs can flip the sign of PnL, remaining-sample labels are rejected, walk-forward dates do not overlap, and the report cannot forget where the prices came from. That is the recruiting bar this repo is aimed at. Alpha lives somewhere else, and it has to survive a process at least this hostile.
 
 ---
 
@@ -157,7 +163,7 @@ No live performance is claimed. No live performance should be inferred. If a num
 
 Walk-forward with an embargo stops a *contiguous* test window from sitting inside train. It does not stop you from using every other Tuesday as a test set while the labels that overlap those Tuesdays stay in train.
 
-López de Prado, *Advances in Financial Machine Learning* (2018), Chapter 7: a label formed at bar `i` that uses information through `i + h` overlaps a test interval `[t0, t1]` when `i <= t1` and `i + h >= t0`. Those train observations are **purged**. Serial correlation still leaks through the first bars *after* the test window; those are the **embargo**.
+López de Prado, *Advances in Financial Machine Learning* (2018), Chapter 7: a label formed at bar `i` that uses information through `i + h` overlaps a test interval `[t0, t1]` when `i <= t1` and `i + h >= t0`. Those train observations are **purged**. Serial correlation still leaks through the first bars *after* the test window; those are the **embargo**. `qre.research.labels` is the finite-horizon construction those procedures assume. An unbounded remaining-sample label cannot be purged.
 
 This repo encodes that in `qre.research.purged_cv`:
 
