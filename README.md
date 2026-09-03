@@ -94,6 +94,7 @@ Honest example (labeled SYNTHETIC fixture, not a market): a 0/1 flip every bar o
 ## Anti-overfitting guardrails (in code + tests, not just docs)
 
 - **Look-ahead.** Features at t are invariant to prices after t. Test: two panels identical through t, different after; feature values through t match.
+- **Look-ahead in labels.** A target dated t with horizon h is invariant to prices after t+h. Remaining-sample returns (`close[T]/close[t] - 1`, “how did this work out by the end of the backtest”) are not. Forward returns are labels, not features. The executable target, given `fill_delay=1`, starts at the fill bar, not the signal bar. Test: `tests/test_label_lookahead.py`.
 - **No future bars.** Rolling windows only use dates `<= t`. `ExecutionModel.fill_delay` must be `>= 1`.
 - **Walk-forward.** Expanding or rolling splits with an optional embargo. Test-window dates never appear in train. Parameter choice, if any, belongs on train.
 - **Purged k-fold / combinatorial purged CV.** López de Prado, *Advances in Financial Machine Learning*, Chapter 7: overlapping labels are purged from train; an embargo follows the test window. CPCV enumerates combinations of test groups. See `src/qre/research/purged_cv.py` and `tests/test_purged_cv.py`.
@@ -118,6 +119,7 @@ src/qre/
   analytics/dsr.py      # Bailey & López de Prado 2014 DSR
   research/walk_forward.py
   research/purged_cv.py # AFML Ch.7 purge + embargo, CPCV
+  research/labels.py    # finite-horizon forward returns; not features
   cli.py
 ```
 
